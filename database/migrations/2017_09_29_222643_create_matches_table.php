@@ -22,7 +22,7 @@ class CreateMatchesTable extends Migration
             $table->unsignedInteger('home_team_id');
             $table->unsignedInteger('visitor_team_id');
             $table->unsignedInteger('score_home_team')->nullable();
-            $table->unsignedInteger('score_home_team')->nullable();
+            $table->unsignedInteger('score_visitor_team')->nullable();
             $table->unsignedInteger('match_id_api');
             $table->timestamps();
 
