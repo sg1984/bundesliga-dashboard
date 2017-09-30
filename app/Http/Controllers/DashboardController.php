@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\NoMatchesOnDatabaseException;
 use App\Group;
 use App\Result;
+use App\Services\BundesligaApi;
 
 class DashboardController extends Controller
 {
@@ -14,32 +16,72 @@ class DashboardController extends Controller
      */
     public function index($groupId = null)
     {
-        if( ! empty($groupId) ){
-            $group = Group::where('id', $groupId)
-                ->with('matches')
-                ->first();
-        }
+        try {
+            if (!empty($groupId)) {
+                $group = Group::where('id', $groupId)
+                    ->with('matches')
+                    ->first();
+            }
 
-        if( empty($group) || empty($groupId) ){
-            $group = Group::getNextGroup();
-        }
-        $matches = $group->matches;
-        $allGroups = Group::all()->pluck('id');
+            if (empty($group) || empty($groupId)) {
+                $group = Group::getNextGroup();
+            }
 
-        return view('index', compact('matches','allGroups','group'));
+            if( $group->hasMatchDay() ){
+                $group = $group->updateInfoFromApi();
+            }
+
+            $matchesGrupedByDay = $group->matches->groupBy('match_date_formatted');
+            $allGroups = Group::all()->pluck('id');
+
+            return view('index', compact('matchesGrupedByDay', 'allGroups', 'group'));
+        }
+        catch(NoMatchesOnDatabaseException $e){
+            BundesligaApi::populateDatabase();
+
+            return redirect()->route('dashboard');
+        }
+        catch (\Exception $e) {
+            $error = $e->getMessage();
+
+            return view('error', compact('error'));
+        }
     }
 
     public function showTable()
     {
-        $allGroups = Group::all()->pluck('id');
-        $results = Result::query()
-            ->with('team')
-            ->orderBy('points', 'desc')
-            ->orderBy('goals_diff', 'desc')
-            ->orderBy('goals_pro', 'desc')
-            ->orderBy('goals_against')
-            ->get();
+        try {
+            $allGroups = Group::all()->pluck('id');
+            $results = Result::query()
+                ->with('team')
+                ->orderBy('points', 'desc')
+                ->orderBy('goals_diff', 'desc')
+                ->orderBy('goals_pro', 'desc')
+                ->orderBy('goals_against')
+                ->get();
 
-        return view('table',compact('results', 'allGroups'));
+            $updatedAt = $results->first()->updated_at->format('d/m/Y H:i');
+
+            return view('table', compact('results', 'allGroups','updatedAt'));
+        }
+        catch (\Exception $e) {
+            $error = $e->getMessage();
+
+            return view('error', compact('error'));
+        }
+    }
+
+    public function about()
+    {
+        try {
+            $allGroups = Group::all()->pluck('id');
+
+            return view('about', compact('allGroups'));
+        }
+        catch (\Exception $e) {
+            $error = $e->getMessage();
+
+            return view('error', compact('error'));
+        }
     }
 }

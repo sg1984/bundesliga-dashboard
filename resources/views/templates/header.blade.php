@@ -10,4 +10,5 @@
 
     <link href="{!! asset('css/app.css') !!}" media="all" rel="stylesheet" type="text/css" />
     <link href="{!! asset('css/sb-admin.min.css') !!}" media="all" rel="stylesheet" type="text/css" />
+    <link href="{!! asset('css/custom.css') !!}" media="all" rel="stylesheet" type="text/css" />
 </head>

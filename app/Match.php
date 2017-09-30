@@ -41,6 +41,11 @@ class Match extends Model
         return $query->where('is_finished', false);
     }
 
+    public function scopeIsToday($query, $is_today = true)
+    {
+        return $query->where('is_today', $is_today);
+    }
+
     public static function createFromApiData(Group $group, $matchFromApi)
     {
         $homeTeam = Team::query()->byTeamIdFromApi($matchFromApi->Team1->TeamId)->first();
@@ -72,6 +77,23 @@ class Match extends Model
         return $match;
     }
 
+    public function updateFromApiData($matchFromApi)
+    {
+        $this->match_id_api = $matchFromApi->MatchID;
+        $this->date_time = Carbon::createFromFormat('Y-m-d\TH:i:s', $matchFromApi->MatchDateTime);
+        $this->is_today = $this->date_time->isToday();
+        $this->is_finished = $matchFromApi->MatchIsFinished;
+
+        if( $this->is_finished ){
+            $this->score_home_team = $matchFromApi->MatchResults[1]->PointsTeam1;
+            $this->score_visitor_team = $matchFromApi->MatchResults[1]->PointsTeam2;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
     public function scopeByMatchIdFromApi($query, $matchIdFromApi)
     {
         return $query->where('match_id_api', $matchIdFromApi);
@@ -80,7 +102,6 @@ class Match extends Model
     public function analyseResultIfFinished()
     {
         if( $this->isFinished() ){
-            echo 'Match::' . $this->id . PHP_EOL;
 
             $resultHomeTeam = $this->homeTeam
                 ->getResultFromSeason( $this->group->season );
@@ -146,17 +167,14 @@ class Match extends Model
             ]);
 
             if( $this->hasHomeTeamWon() ){
-                echo 'Match::' . $this->id . ' => HOME' . PHP_EOL;
                 $resultHomeTeam->teamWonMatch();
                 $resultVisitorTeam->teamLostMatch();
             }
             elseif( $this->hasVisitorTeamWon() ){
-                echo 'Match::' . $this->id . ' => VISITOR' . PHP_EOL;
                 $resultHomeTeam->teamLostMatch();
                 $resultVisitorTeam->teamWonMatch();
             }
             else{
-                echo 'Match::' . $this->id . ' => DRAW' . PHP_EOL;
                 $resultHomeTeam->teamDrawMatch();
                 $resultVisitorTeam->teamDrawMatch();
             }
@@ -192,6 +210,16 @@ class Match extends Model
         return $this->date_time->format('d/m/Y H:i');
     }
 
+    public function getMatchDateFormattedAttribute()
+    {
+        return $this->date_time->format('d/m/Y');
+    }
+
+    public function getMatchTimeFormattedAttribute()
+    {
+        return $this->date_time->format('H:i');
+    }
+
     public function isFinished()
     {
         return $this->is_finished == 1;
@@ -205,5 +233,10 @@ class Match extends Model
     public function getVisitorScore()
     {
         return intval($this->score_visitor_team);
+    }
+
+    public function matchIsToday()
+    {
+        return $this->is_today;
     }
 }

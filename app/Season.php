@@ -23,6 +23,11 @@ class Season extends Model
         return $this->hasMany(Group::class);
     }
 
+    public function results()
+    {
+        return $this->hasMany(Result::class);
+    }
+
     public static function createFromApiData($firstMatch, $lastMatch)
     {
         return self::create([
@@ -32,5 +37,31 @@ class Season extends Model
             'league_id_api'       => $firstMatch->LeagueId,
             'league_shortcut_api' => 'bl1',
         ]);
+    }
+
+    public function getShortName()
+    {
+        return $this->league_shortcut_api;
+    }
+
+    public function getYear()
+    {
+        return $this->date_first_round->format('Y');
+    }
+
+    public static function getCurrentSeason()
+    {
+        $year = Carbon::now()->format('Y');
+        $yearLike = $year . '%';
+
+        $season = Season::query()
+            ->where('date_first_round', 'like', $yearLike)
+            ->first();
+
+        if( empty($season) ){
+            throw new \Exception('No season found in database');
+        }
+
+        return $season;
     }
 }

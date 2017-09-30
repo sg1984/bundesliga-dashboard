@@ -86,6 +86,8 @@ class Result extends Model
             'points' => $points,
         ]);
         $this->save();
+
+        return;
     }
 
     public function teamLostMatch()
@@ -95,6 +97,8 @@ class Result extends Model
             'lost'   => $lost,
         ]);
         $this->save();
+
+        return;
     }
 
     public function teamDrawMatch()
@@ -106,15 +110,44 @@ class Result extends Model
             'points' => $points
         ]);
         $this->save();
+
+        return;
     }
 
     public function getWonRatio()
     {
-        return ($this->getWon() / $this->getNumberOfMatches()) * 100;
+        return (($this->getWon() + ( $this->getDraw() * 0.5 )) / $this->getNumberOfMatches()) * 100;
     }
 
     public function getLostRatio()
     {
         return ($this->getLost() / $this->getNumberOfMatches()) * 100;
+    }
+
+    public function clearResultsInfo()
+    {
+        $this->update([
+            'won'           => 0,
+            'lost'          => 0,
+            'draw'          => 0,
+            'goals_pro'     => 0,
+            'goals_against' => 0,
+            'goals_diff'    => 0,
+            'points'        => 0,
+        ]);
+        $this->save();
+
+        return $this;
+    }
+
+    public static function resetResultsFromSeason(Season $season)
+    {
+        $results = $season->results;
+        foreach ($results as $result){
+            echo 'Reset results from team ' . $result->team->name() . PHP_EOL;
+            $result->clearResultsInfo();
+        }
+
+        return;
     }
 }

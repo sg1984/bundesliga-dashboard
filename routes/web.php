@@ -16,6 +16,11 @@ Route::get('/show-table', [
     'uses' => 'DashboardController@showTable',
 ]);
 
+Route::get('about', [
+    'as' => 'about',
+    'uses' => 'DashboardController@about',
+]);
+
 Route::get('/{group?}', [
     'as' => 'dashboard',
     'uses' => 'DashboardController@index',

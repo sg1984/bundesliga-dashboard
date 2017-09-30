@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Group;
 use App\Match;
+use App\Result;
 use App\Season;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\DB;
 
 class BundesligaApi
 {
@@ -24,74 +26,112 @@ class BundesligaApi
         return $this->apiClient;
     }
 
-//    public static function getCurrentGroupFromApi()
-//    {
-//        $apiService = new self();
-//        $currentGroupMatchesFromApi = $apiService->getGroupMatchesFromApi();
-//
-//        $lastMatchGroup = new Group($apiService->getLeague());
-//        $lastMatchGroup->setMatchesToGroup($currentGroupMatchesFromApi);
-//
-//        return $lastMatchGroup;
-//    }
-//
-//    public function getGroupMatchesFromApi(Group $group = null)
-//    {
-//        $url = config('services.bundesliga.matches') . $this->getLeagueShortName();
-//
-//        if( ! empty($group) ){
-//            $url .= '/' . $group->getLeague()->getYear() . '/' . $group->getGroupOrder();
-//        }
-//
-//        $response = $this
-//            ->getApiClient()
-//            ->get($url)
-//            ->getBody()
-//            ->getContents();
-//
-//        return collect(json_decode($response));
-//    }
-
-    public static function populateDatabase()
+    protected function callApiService($url)
     {
-        $apiService = new self();
-        $year = Carbon::now()->format('Y');
-        $url = config('services.bundesliga.matches') . 'bl1/' . $year;
-
-        echo 'Getting all matches from the API...' . PHP_EOL;
-        $response = $apiService
+        return $this
             ->getApiClient()
             ->get($url)
             ->getBody()
             ->getContents();
+    }
 
-        $allMatches = collect(json_decode($response));
-        $firstMatch = $allMatches->first();
-        $lastMatch = $allMatches->last();
+    public static function getGroupMatchesFromApi(Season $season, Group $group)
+    {
+        $apiService = new self();
 
-        echo count($allMatches) . ' matches returned...' . PHP_EOL;
+        $url = config('services.bundesliga.matches') . $season->getShortName();
+        $url .= '/' . $season->getYear() . '/' . $group->getGroupOrder();
 
-        $season = Season::first();
-        if( empty($season) ){
-            $season = Season::createFromApiData($firstMatch, $lastMatch);
-        }
-        echo 'Updating info from season ' . $season->name . PHP_EOL;
+        $response = $apiService->callApiService($url);
 
-        foreach ($allMatches as $matchFromApi){
-            $groupFromApi = $matchFromApi->Group;
-            $group = Group::query()->byGroupIdFromApi($groupFromApi->GroupID)->first();
-            if( empty($group) ){
-                $group = Group::createFromApiData($season, $matchFromApi->Group);
+        return collect(json_decode($response));
+    }
+
+    public static function populateDatabase()
+    {
+        DB::beginTransaction();
+        try {
+            $apiService = new self();
+            $year = Carbon::now()->format('Y');
+            $url = config('services.bundesliga.matches') . 'bl1/' . $year;
+            $response = $apiService->callApiService($url);
+
+            $allMatches = collect(json_decode($response));
+            $firstMatch = $allMatches->first();
+            $lastMatch = $allMatches->last();
+
+            $season = Season::first();
+            if (empty($season)) {
+                $season = Season::createFromApiData($firstMatch, $lastMatch);
             }
-            $group->load('season');
 
-            $match = Match::query()->byMatchIdFromApi($matchFromApi->MatchID)->first();
-            if( empty($match) ){
-                $match = Match::createFromApiData($group, $matchFromApi);
+            foreach ($allMatches as $matchFromApi) {
+                $groupFromApi = $matchFromApi->Group;
+                $group = Group::query()->byGroupIdFromApi($groupFromApi->GroupID)->first();
+                if (empty($group)) {
+                    $group = Group::createFromApiData($season, $matchFromApi->Group);
+                }
+                $group->load('season');
+
+                $match = Match::query()->byMatchIdFromApi($matchFromApi->MatchID)->first();
+                if (empty($match)) {
+                    $match = Match::createFromApiData($group, $matchFromApi);
+                }
+
+                $match->analyseResultIfFinished();
             }
-//            echo 'Updating data from match ' . $match->id . PHP_EOL;
-
-            $match->analyseResultIfFinished();
+            DB::commit();
         }
+        catch (Exception $e) {
+            DB::rollback();
+
+            throw $e;
+        }
+
+        return;
+    }
+
+    public static function updateMatchesInfo($showLog = false)
+    {
+        DB::beginTransaction();
+        try {
+            $season = Season::getCurrentSeason();
+            $apiService = new self();
+            Result::resetResultsFromSeason($season);
+
+            $url = config('services.bundesliga.matches') . $season->getShortName() . '/' . $season->getYear();
+            $response = $apiService->callApiService($url);
+
+            $allMatches = collect(json_decode($response));
+
+            foreach ($allMatches as $matchFromApi){
+                $groupFromApi = $matchFromApi->Group;
+                $group = Group::query()->byGroupIdFromApi($groupFromApi->GroupID)->first();
+                if (empty($group)) {
+                    $group = Group::createFromApiData($season, $matchFromApi->Group);
+                }
+                $group->load('season');
+
+                $match = Match::query()->byMatchIdFromApi($matchFromApi->MatchID)->first();
+                if (empty($match)) {
+                    $match = Match::createFromApiData($group, $matchFromApi);
+                }
+
+                if ($showLog) {
+                    echo 'Updating data from match ' . $match->id . PHP_EOL;
+                }
+
+                $match->updateFromApiData($matchFromApi);
+                $match->analyseResultIfFinished();
+            }
+
+            DB::commit();
+        }
+        catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
+
+        return;
     }
 }

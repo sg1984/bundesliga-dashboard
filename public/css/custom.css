@@ -1,0 +1,11 @@
+.bg-info, .breadcrumb{
+    border-radius: 10px;
+}
+
+.table-results td, .table-results th{
+    text-align: center;
+}
+
+.container-fluid{
+    max-width: 1000px;
+}
