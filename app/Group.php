@@ -76,7 +76,7 @@ class Group extends Model
         return $this->todayMatches()->count() > 0;
     }
 
-    public function updateInfoFromApi($updateAll = false, $showLog = false)
+    public function updateInfoFromApi($showLog = false)
     {
         DB::beginTransaction();
         try {
@@ -89,7 +89,7 @@ class Group extends Model
                 }
 
                 $match->updateFromApiData($matchFromApi);
-                $match->analyseResultIfFinished($updateAll);
+                $match->analyseResultIfFinished();
             }
             DB::commit();
         }

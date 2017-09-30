@@ -12,9 +12,16 @@ class Match extends Model
         'group_id', 'date_time', 'is_finished',
         'is_today', 'home_team_id', 'visitor_team_id',
         'score_home_team', 'score_visitor_team', 'match_id_api',
+        'result_updated',
     ];
 
     protected $dates = ['date_time'];
+
+    protected $casts = [
+        'is_finished'       => 'boolean',
+        'is_today'          => 'boolean',
+        'result_updated'    => 'boolean',
+    ];
 
     public function group()
     {
@@ -67,7 +74,7 @@ class Match extends Model
         $match->visitorTeam()->associate($visitorTeam);
         $match->group()->associate($group);
 
-        if( $match->is_finished ){
+        if( $match->isFinished() ){
             $match->score_home_team = $matchFromApi->MatchResults[1]->PointsTeam1;
             $match->score_visitor_team = $matchFromApi->MatchResults[1]->PointsTeam2;
         }
@@ -84,7 +91,7 @@ class Match extends Model
         $this->is_today = $this->date_time->isToday();
         $this->is_finished = $matchFromApi->MatchIsFinished;
 
-        if( $this->is_finished ){
+        if( $this->isFinished() ){
             $this->score_home_team = $matchFromApi->MatchResults[1]->PointsTeam1;
             $this->score_visitor_team = $matchFromApi->MatchResults[1]->PointsTeam2;
         }
@@ -101,7 +108,7 @@ class Match extends Model
 
     public function analyseResultIfFinished()
     {
-        if( $this->isFinished() ){
+        if( $this->isFinished() && ! $this->matchUsedToUpdateResultFromTeams() ){
 
             $resultHomeTeam = $this->homeTeam
                 ->getResultFromSeason( $this->group->season );
@@ -122,6 +129,9 @@ class Match extends Model
                 $resultVisitorTeam->team()->associate($this->visitorTeam);
                 $resultVisitorTeam->save();
             }
+
+            $resultHomeTeam = Result::where('id', $resultHomeTeam->id)->first();
+            $resultVisitorTeam = Result::where('id', $resultVisitorTeam->id)->first();
 
             $scoreHomeTeam = [
                 'goals_pro' => 0,
@@ -181,7 +191,12 @@ class Match extends Model
 
             $resultHomeTeam->save();
             $resultVisitorTeam->save();
+            $this->update([
+                'result_updated' => true,
+            ]);
         }
+
+        $this->save();
 
         return $this;
     }
@@ -222,7 +237,7 @@ class Match extends Model
 
     public function isFinished()
     {
-        return $this->is_finished == 1;
+        return $this->is_finished;
     }
 
     public function getHomeScore()
@@ -238,5 +253,10 @@ class Match extends Model
     public function matchIsToday()
     {
         return $this->is_today;
+    }
+
+    public function matchUsedToUpdateResultFromTeams()
+    {
+        return $this->result_updated;
     }
 }

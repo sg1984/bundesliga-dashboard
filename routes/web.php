@@ -21,6 +21,11 @@ Route::get('about', [
     'uses' => 'DashboardController@about',
 ]);
 
+Route::get('load', [
+    'as' => 'load-info',
+    'uses' => 'DashboardController@loadInfo',
+]);
+
 Route::get('/{group?}', [
     'as' => 'dashboard',
     'uses' => 'DashboardController@index',

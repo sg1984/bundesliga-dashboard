@@ -6,6 +6,7 @@ use App\Exceptions\NoMatchesOnDatabaseException;
 use App\Group;
 use App\Result;
 use App\Services\BundesligaApi;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -37,9 +38,8 @@ class DashboardController extends Controller
             return view('index', compact('matchesGrupedByDay', 'allGroups', 'group'));
         }
         catch(NoMatchesOnDatabaseException $e){
-            BundesligaApi::populateDatabase();
 
-            return redirect()->route('dashboard');
+            return redirect()->route('about');
         }
         catch (\Exception $e) {
             $error = $e->getMessage();
@@ -74,9 +74,21 @@ class DashboardController extends Controller
     public function about()
     {
         try {
-            $allGroups = Group::all()->pluck('id');
+            return view('about', ['loadInfo' => true]);
+        }
+        catch (\Exception $e) {
+            $error = $e->getMessage();
 
-            return view('about', compact('allGroups'));
+            return view('error', compact('error'));
+        }
+    }
+
+    public function loadInfo()
+    {
+        try {
+            BundesligaApi::populateDatabase();
+
+            return redirect()->route('dashboard');
         }
         catch (\Exception $e) {
             $error = $e->getMessage();

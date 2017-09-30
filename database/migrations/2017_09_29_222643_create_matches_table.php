@@ -19,6 +19,7 @@ class CreateMatchesTable extends Migration
             $table->dateTime('date_time');
             $table->boolean('is_finished')->default(false);
             $table->boolean('is_today')->default(false);
+            $table->boolean('result_updated')->default(false);
             $table->unsignedInteger('home_team_id');
             $table->unsignedInteger('visitor_team_id');
             $table->unsignedInteger('score_home_team')->nullable();

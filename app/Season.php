@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Services\BundesligaApi;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
@@ -59,7 +60,7 @@ class Season extends Model
             ->first();
 
         if( empty($season) ){
-            throw new \Exception('No season found in database');
+            throw new \Exception('No season found in database.');
         }
 
         return $season;

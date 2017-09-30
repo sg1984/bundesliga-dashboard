@@ -140,12 +140,15 @@ class Result extends Model
         return $this;
     }
 
-    public static function resetResultsFromSeason(Season $season)
+    public static function resetResultsFromSeason(Season $season, $showLog = true)
     {
-        $results = $season->results;
+        $results = $season->results()->get();
         foreach ($results as $result){
-            echo 'Reset results from team ' . $result->team->name() . PHP_EOL;
+            if( $showLog ){
+                echo 'Reset results from team ' . $result->team->name() . PHP_EOL;
+            }
             $result->clearResultsInfo();
+            $result->save();
         }
 
         return;

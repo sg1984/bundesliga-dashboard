@@ -55,8 +55,14 @@ class BundesligaApi
             $year = Carbon::now()->format('Y');
             $url = config('services.bundesliga.matches') . 'bl1/' . $year;
             $response = $apiService->callApiService($url);
-
             $allMatches = collect(json_decode($response));
+
+            if( count($allMatches) < 1 ){
+                $url = config('services.bundesliga.matches') . 'bl1/' . ($year - 1);
+                $response = $apiService->callApiService($url);
+                $allMatches = collect(json_decode($response));
+            }
+
             $firstMatch = $allMatches->first();
             $lastMatch = $allMatches->last();
 
@@ -79,6 +85,7 @@ class BundesligaApi
                 }
 
                 $match->analyseResultIfFinished();
+
             }
             DB::commit();
         }
@@ -96,6 +103,7 @@ class BundesligaApi
         DB::beginTransaction();
         try {
             $season = Season::getCurrentSeason();
+
             $apiService = new self();
             Result::resetResultsFromSeason($season);
 
@@ -105,24 +113,14 @@ class BundesligaApi
             $allMatches = collect(json_decode($response));
 
             foreach ($allMatches as $matchFromApi){
-                $groupFromApi = $matchFromApi->Group;
-                $group = Group::query()->byGroupIdFromApi($groupFromApi->GroupID)->first();
-                if (empty($group)) {
-                    $group = Group::createFromApiData($season, $matchFromApi->Group);
-                }
-                $group->load('season');
-
                 $match = Match::query()->byMatchIdFromApi($matchFromApi->MatchID)->first();
-                if (empty($match)) {
-                    $match = Match::createFromApiData($group, $matchFromApi);
-                }
-
                 if ($showLog) {
                     echo 'Updating data from match ' . $match->id . PHP_EOL;
                 }
 
                 $match->updateFromApiData($matchFromApi);
                 $match->analyseResultIfFinished();
+                $match->save();
             }
 
             DB::commit();
