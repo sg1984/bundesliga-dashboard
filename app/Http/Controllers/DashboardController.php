@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\DB;
 class DashboardController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Show the current group matches
      *
-     * @return \Illuminate\Http\Response
+     * @param null $groupId
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Http\RedirectResponse|\Illuminate\View\View
      */
     public function index($groupId = null)
     {
@@ -48,6 +49,11 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * Call the table with the current result from the Bundesliga
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
     public function showTable()
     {
         try {
@@ -71,6 +77,11 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * Shows the about page, with information about the application
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
     public function about()
     {
         try {
@@ -83,6 +94,11 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * Populate the database
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     */
     public function loadInfo()
     {
         try {

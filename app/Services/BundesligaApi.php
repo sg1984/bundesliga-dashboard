@@ -47,6 +47,11 @@ class BundesligaApi
         return collect(json_decode($response));
     }
 
+    /**
+     * Get the all the matches from API and populate the database
+     *
+     * @throws \Exception
+     */
     public static function populateDatabase()
     {
         DB::beginTransaction();
@@ -98,6 +103,12 @@ class BundesligaApi
         return;
     }
 
+    /**
+     * Update the information from the database with data from API
+     *
+     * @param bool $showLog
+     * @throws \Exception
+     */
     public static function updateMatchesInfo($showLog = false)
     {
         DB::beginTransaction();

@@ -53,6 +53,82 @@ class Match extends Model
         return $query->where('is_today', $is_today);
     }
 
+    public function scopeByMatchIdFromApi($query, $matchIdFromApi)
+    {
+        return $query->where('match_id_api', $matchIdFromApi);
+    }
+
+    private function hasHomeTeamWon()
+    {
+        if( $this->getHomeScore() > $this->getVisitorScore() ){
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasVisitorTeamWon()
+    {
+        if( $this->getHomeScore() < $this->getVisitorScore() ){
+
+            return true;
+        }
+        return false;
+    }
+
+    public function getDateTimeString()
+    {
+        return $this->date_time->format('d/m/Y H:i');
+    }
+
+    public function getMatchDateFormattedAttribute()
+    {
+        return $this->date_time->format('d/m/Y');
+    }
+
+    public function getMatchTimeFormattedAttribute()
+    {
+        return $this->date_time->format('H:i');
+    }
+
+    public function isFinished()
+    {
+        return $this->is_finished;
+    }
+
+    public function getHomeScore()
+    {
+        return intval($this->score_home_team);
+    }
+
+    public function getVisitorScore()
+    {
+        return intval($this->score_visitor_team);
+    }
+
+    public function matchIsToday()
+    {
+        return $this->is_today;
+    }
+
+    /**
+     * Verify if the results from this match was used to update the table of results
+     *
+     * @return mixed
+     */
+    public function matchUsedToUpdateResultFromTeams()
+    {
+        return $this->result_updated;
+    }
+
+    /**
+     * Create a match with the information from the API
+     *
+     * @param Group $group
+     * @param       $matchFromApi
+     * @return Match
+     */
     public static function createFromApiData(Group $group, $matchFromApi)
     {
         $homeTeam = Team::query()->byTeamIdFromApi($matchFromApi->Team1->TeamId)->first();
@@ -84,6 +160,12 @@ class Match extends Model
         return $match;
     }
 
+    /**
+     * Update the match with information retrieved from API
+     *
+     * @param $matchFromApi
+     * @return $this
+     */
     public function updateFromApiData($matchFromApi)
     {
         $this->match_id_api = $matchFromApi->MatchID;
@@ -101,11 +183,11 @@ class Match extends Model
         return $this;
     }
 
-    public function scopeByMatchIdFromApi($query, $matchIdFromApi)
-    {
-        return $query->where('match_id_api', $matchIdFromApi);
-    }
-
+    /**
+     * Analyse the result from the match and update the results table information from the teams
+     *
+     * @return $this
+     */
     public function analyseResultIfFinished()
     {
         if( $this->isFinished() && ! $this->matchUsedToUpdateResultFromTeams() ){
@@ -199,64 +281,5 @@ class Match extends Model
         $this->save();
 
         return $this;
-    }
-
-    private function hasHomeTeamWon()
-    {
-        if( $this->getHomeScore() > $this->getVisitorScore() ){
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private function hasVisitorTeamWon()
-    {
-        if( $this->getHomeScore() < $this->getVisitorScore() ){
-
-            return true;
-        }
-        return false;
-    }
-
-    public function getDateTimeString()
-    {
-        return $this->date_time->format('d/m/Y H:i');
-    }
-
-    public function getMatchDateFormattedAttribute()
-    {
-        return $this->date_time->format('d/m/Y');
-    }
-
-    public function getMatchTimeFormattedAttribute()
-    {
-        return $this->date_time->format('H:i');
-    }
-
-    public function isFinished()
-    {
-        return $this->is_finished;
-    }
-
-    public function getHomeScore()
-    {
-        return intval($this->score_home_team);
-    }
-
-    public function getVisitorScore()
-    {
-        return intval($this->score_visitor_team);
-    }
-
-    public function matchIsToday()
-    {
-        return $this->is_today;
-    }
-
-    public function matchUsedToUpdateResultFromTeams()
-    {
-        return $this->result_updated;
     }
 }

@@ -26,26 +26,19 @@ class Group extends Model
         return $this->hasMany(Match::class);
     }
 
+    public function scopeByGroupIdFromApi($query, $groupIdFromApi)
+    {
+        return $query->where('group_id_api', $groupIdFromApi);
+    }
+
     public function todayMatches()
     {
         return $this->matches()->isToday();
     }
 
-    public static function createFromApiData(Season $season, $groupInfoFromApi)
+    public function hasMatchDay()
     {
-        $group = new self([
-            'group_order'  => $groupInfoFromApi->GroupOrderID,
-            'group_id_api' => $groupInfoFromApi->GroupID,
-        ]);
-        $group->season()->associate($season);
-        $group->save();
-
-        return $group;
-    }
-
-    public function scopeByGroupIdFromApi($query, $groupIdFromApi)
-    {
-        return $query->where('group_id_api', $groupIdFromApi);
+        return $this->todayMatches()->count() > 0;
     }
 
     public static function getNextGroup()
@@ -55,7 +48,7 @@ class Group extends Model
             ->first();
 
         if( empty($nextMatch) ){
-            throw new NoMatchesOnDatabaseException('THE DATABASE IS EMPTY!!!');
+            throw new NoMatchesOnDatabaseException('There is no information about the next matches in the databases.');
         }
 
         $nextGroup = self::query()
@@ -71,11 +64,39 @@ class Group extends Model
         return $this->group_order;
     }
 
-    public function hasMatchDay()
+    public function getLastUpdatedDateTimeFormatted()
     {
-        return $this->todayMatches()->count() > 0;
+        $lastUpdatedMatch = $this->matches->sortByDesc('updated_at')->first();
+
+        return $lastUpdatedMatch->updated_at->format('d/m/Y H:i');
     }
 
+    /**
+     * Create a new instance of Group with information retrieved from API
+     *
+     * @param Season $season
+     * @param        $groupInfoFromApi
+     * @return Group
+     */
+    public static function createFromApiData(Season $season, $groupInfoFromApi)
+    {
+        $group = new self([
+            'group_order'  => $groupInfoFromApi->GroupOrderID,
+            'group_id_api' => $groupInfoFromApi->GroupID,
+        ]);
+        $group->season()->associate($season);
+        $group->save();
+
+        return $group;
+    }
+
+    /**
+     * Update the group information with the data from API
+     *
+     * @param bool $showLog
+     * @return $this
+     * @throws \Exception
+     */
     public function updateInfoFromApi($showLog = false)
     {
         DB::beginTransaction();
@@ -100,12 +121,5 @@ class Group extends Model
         }
 
         return $this;
-    }
-
-    public function getLastUpdatedDateTimeFormatted()
-    {
-        $lastUpdatedMatch = $this->matches->sortByDesc('updated_at')->first();
-
-        return $lastUpdatedMatch->updated_at->format('d/m/Y H:i');
     }
 }

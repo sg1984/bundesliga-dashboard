@@ -21,16 +21,6 @@ class Team extends Model
         return $query->where('team_id_api', $teamIdFromApi);
     }
 
-    public static function createFromApiData($teamInfo)
-    {
-        return self::create([
-            'team_name' => $teamInfo->TeamName,
-            'team_short_name' => $teamInfo->ShortName,
-            'icon_url' => $teamInfo->TeamIconUrl,
-            'team_id_api' => $teamInfo->TeamId,
-        ]);
-    }
-
     public function getResultFromSeason(Season $season)
     {
         return $this
@@ -56,5 +46,21 @@ class Team extends Model
         }
 
         return $this->team_name;
+    }
+
+    /**
+     * Create a new instance of Team with data from API
+     *
+     * @param $teamInfo
+     * @return mixed
+     */
+    public static function createFromApiData($teamInfo)
+    {
+        return self::create([
+            'team_name' => $teamInfo->TeamName,
+            'team_short_name' => $teamInfo->ShortName,
+            'icon_url' => $teamInfo->TeamIconUrl,
+            'team_id_api' => $teamInfo->TeamId,
+        ]);
     }
 }

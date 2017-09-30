@@ -29,17 +29,6 @@ class Season extends Model
         return $this->hasMany(Result::class);
     }
 
-    public static function createFromApiData($firstMatch, $lastMatch)
-    {
-        return self::create([
-            'name'                => $firstMatch->LeagueName,
-            'date_first_round'    => Carbon::createFromFormat('Y-m-d\TH:i:s', $firstMatch->MatchDateTime),
-            'date_last_round'     => Carbon::createFromFormat('Y-m-d\TH:i:s', $lastMatch->MatchDateTime),
-            'league_id_api'       => $firstMatch->LeagueId,
-            'league_shortcut_api' => 'bl1',
-        ]);
-    }
-
     public function getShortName()
     {
         return $this->league_shortcut_api;
@@ -64,5 +53,23 @@ class Season extends Model
         }
 
         return $season;
+    }
+
+    /**
+     * Create a new instance of Season with data from API
+     *
+     * @param $firstMatch
+     * @param $lastMatch
+     * @return mixed
+     */
+    public static function createFromApiData($firstMatch, $lastMatch)
+    {
+        return self::create([
+            'name'                => $firstMatch->LeagueName,
+            'date_first_round'    => Carbon::createFromFormat('Y-m-d\TH:i:s', $firstMatch->MatchDateTime),
+            'date_last_round'     => Carbon::createFromFormat('Y-m-d\TH:i:s', $lastMatch->MatchDateTime),
+            'league_id_api'       => $firstMatch->LeagueId,
+            'league_shortcut_api' => 'bl1',
+        ]);
     }
 }

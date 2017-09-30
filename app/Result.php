@@ -77,6 +77,16 @@ class Result extends Model
         return $this->getWon() + $this->getLost() + $this->getDraw();
     }
 
+    public function getWonRatio()
+    {
+        return (($this->getWon() + ( $this->getDraw() * 0.5 )) / $this->getNumberOfMatches()) * 100;
+    }
+
+    public function getLostRatio()
+    {
+        return ($this->getLost() / $this->getNumberOfMatches()) * 100;
+    }
+
     public function teamWonMatch()
     {
         $won = $this->getWon() + 1;
@@ -112,16 +122,6 @@ class Result extends Model
         $this->save();
 
         return;
-    }
-
-    public function getWonRatio()
-    {
-        return (($this->getWon() + ( $this->getDraw() * 0.5 )) / $this->getNumberOfMatches()) * 100;
-    }
-
-    public function getLostRatio()
-    {
-        return ($this->getLost() / $this->getNumberOfMatches()) * 100;
     }
 
     public function clearResultsInfo()
