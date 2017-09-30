@@ -11,12 +11,12 @@
 |
 */
 
-Route::get('/', [
-    'as' => 'dashboard',
-    'uses' => 'DashboardController@index',
+Route::get('/show-table', [
+    'as' => 'table',
+    'uses' => 'DashboardController@showTable',
 ]);
 
-Route::get('{year?}/{group?}', [
-    'as' => 'dashboard.group',
-    'uses' => 'DashboardController@showGroupMatches',
+Route::get('/{group?}', [
+    'as' => 'dashboard',
+    'uses' => 'DashboardController@index',
 ]);

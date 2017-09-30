@@ -3,19 +3,19 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 
 class Group extends Model
 {
     protected $table = 'groups';
 
     protected $fillable = [
-        'season_id', 'group_order', 'group_id_api'
+        'season_id', 'group_order', 'group_id_api',
+        'date_start', 'date_end',
     ];
 
-    protected $league = null;
-    protected $groupOrder = null;
-    protected $matches = null;
+    protected $dates = [
+        'date_start', 'date_end'
+    ];
 
     public function season()
     {
@@ -27,72 +27,34 @@ class Group extends Model
         return $this->hasMany(Match::class);
     }
 
-    public function __construct(League $league, $groupOrder = null)
+    public static function createFromApiData(Season $season, $groupInfoFromApi)
     {
-        $this->league = $league;
-        if( ! empty($groupOrder) ){
-            $this->groupOrder = $groupOrder;
-        }
+        $group = new self([
+            'group_order'  => $groupInfoFromApi->GroupOrderID,
+            'group_id_api' => $groupInfoFromApi->GroupID,
+        ]);
+        $group->season()->associate($season);
+        $group->save();
+
+        return $group;
     }
 
-    public function getLeague()
+    public function scopeByGroupIdFromApi($query, $groupIdFromApi)
     {
-        return $this->league;
+        return $query->where('group_id_api', $groupIdFromApi);
     }
 
-    public function getGroupOrder()
+    public static function getNextGroup()
     {
-        return $this->groupOrder;
-    }
+        $nextMatch = Match::query()
+            ->notFinished()
+            ->first();
 
-    public function getNextGroup()
-    {
-        return new Group(
-            $this->league,
-            $this->groupOrder + 1
-        );
-    }
+        $nextGroup = self::query()
+            ->where('id', $nextMatch->group_id)
+            ->with('matches')
+            ->first();
 
-    public function getPreviousGroup()
-    {
-        return new Group(
-            $this->league,
-            $this->groupOrder - 1
-        );
-    }
-
-    public function getMatches()
-    {
-        return $this->matches;
-    }
-
-    public function getMatchesFromApi()
-    {
-        $apiUrl = config('services.bundesliga.matches');
-        $leagueYear = $this->league->getYear();
-        $url = $apiUrl . $this->league->getLeague() . '/' . $leagueYear . '/'  . $this->groupOrder;
-        $response = $this
-            ->league
-            ->getApiClient()
-            ->get($url)
-            ->getBody()
-            ->getContents();
-
-        return collect(json_decode($response));
-    }
-
-    public function setMatchesToGroup($collectionOfMatches)
-    {
-        $matches = [];
-        foreach ($collectionOfMatches as $matchInfo){
-            if( empty($this->groupOrder) ){
-                $this->groupOrder = $matchInfo->Group->GroupOrderID;
-            }
-
-            $matches[] = new Match($matchInfo);
-        }
-
-        $this->matches = collect($matches);
-        return $this->matches;
+        return $nextGroup;
     }
 }

@@ -3,11 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Group;
-use App\League;
-use App\Services\BundesligaApi;
-use Carbon\Carbon;
-use GuzzleHttp\Client;
-use Illuminate\Http\Request;
+use App\Result;
 
 class DashboardController extends Controller
 {
@@ -16,31 +12,34 @@ class DashboardController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($groupId = null)
     {
-        $currentGroup = BundesligaApi::getCurrentGroupFromApi();
-        $matches = $currentGroup->getMatches();
+        if( ! empty($groupId) ){
+            $group = Group::where('id', $groupId)
+                ->with('matches')
+                ->first();
+        }
 
-        return view('index', compact('matches'));
+        if( empty($group) || empty($groupId) ){
+            $group = Group::getNextGroup();
+        }
+        $matches = $group->matches;
+        $allGroups = Group::all()->pluck('id');
+
+        return view('index', compact('matches','allGroups','group'));
     }
 
-    public function showGroupMatches($year = null, $group = null)
+    public function showTable()
     {
-        $apiService = new BundesligaApi();
-        $viewGroup = new Group($apiService->getLeague(), $group);
-        $groupMatches = $apiService->getGroupMatchesFromApi($viewGroup);
-        $matches = $viewGroup->setMatchesToGroup($groupMatches);
+        $allGroups = Group::all()->pluck('id');
+        $results = Result::query()
+            ->with('team')
+            ->orderBy('points', 'desc')
+            ->orderBy('goals_diff', 'desc')
+            ->orderBy('goals_pro', 'desc')
+            ->orderBy('goals_against')
+            ->get();
 
-        return view('index', compact('matches'));
-    }
-
-    public function allGames()
-    {
-        $client = New Client();
-
-        $response = $client->get('https://www.openligadb.de/api/getmatchdata/bl1/2017');
-        $matches = json_decode($response->getBody()->getContents());
-
-        return view('dashboard', compact('matches'));
+        return view('table',compact('results', 'allGroups'));
     }
 }

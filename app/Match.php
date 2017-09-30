@@ -11,7 +11,7 @@ class Match extends Model
     protected $fillable = [
         'group_id', 'date_time', 'is_finished',
         'is_today', 'home_team_id', 'visitor_team_id',
-        'score_home_team', 'score_home_team', 'match_id_api',
+        'score_home_team', 'score_visitor_team', 'match_id_api',
     ];
 
     protected $dates = ['date_time'];
@@ -23,65 +23,187 @@ class Match extends Model
 
     public function homeTeam()
     {
-        return $this->hasOne(Team::class, 'home_team_id');
+        return $this->belongsTo(Team::class, 'home_team_id');
     }
 
     public function visitorTeam()
     {
-        return $this->hasOne(Team::class, 'visitor_team_id');
+        return $this->belongsTo(Team::class, 'visitor_team_id');
     }
 
-    protected $home = null;
-    protected $visitor = null;
-    protected $dateTime = null;
-    protected $scoreHome = null;
-    protected $scoreVisitor = null;
-    protected $isFinished = false;
-
-    public function __construct($matchInfo)
+    public function scopeFinished($query)
     {
-        $this->setDateTime($matchInfo->MatchDateTimeUTC);
-        $this->home = new Team($matchInfo->Team1);
-        $this->visitor = new Team($matchInfo->Team2);
-        if( $matchInfo->MatchIsFinished ){
-            $this->isFinished = $matchInfo->MatchIsFinished;
-            $this->scoreHome = $matchInfo->MatchResults[1]->PointsTeam1;
-            $this->scoreVisitor = $matchInfo->MatchResults[1]->PointsTeam2;
+        return $query->where('is_finished', true);
+    }
+
+    public function scopeNotFinished($query)
+    {
+        return $query->where('is_finished', false);
+    }
+
+    public static function createFromApiData(Group $group, $matchFromApi)
+    {
+        $homeTeam = Team::query()->byTeamIdFromApi($matchFromApi->Team1->TeamId)->first();
+        if( empty($homeTeam) ){
+            $homeTeam = Team::createFromApiData($matchFromApi->Team1);
         }
+
+        $visitorTeam = Team::query()->byTeamIdFromApi($matchFromApi->Team2->TeamId)->first();
+        if( empty($visitorTeam) ){
+            $visitorTeam = Team::createFromApiData($matchFromApi->Team2);
+        }
+
+        $match = new self();
+        $match->match_id_api = $matchFromApi->MatchID;
+        $match->date_time = Carbon::createFromFormat('Y-m-d\TH:i:s', $matchFromApi->MatchDateTime);
+        $match->is_today = $match->date_time->isToday();
+        $match->is_finished = $matchFromApi->MatchIsFinished;
+        $match->homeTeam()->associate($homeTeam);
+        $match->visitorTeam()->associate($visitorTeam);
+        $match->group()->associate($group);
+
+        if( $match->is_finished ){
+            $match->score_home_team = $matchFromApi->MatchResults[1]->PointsTeam1;
+            $match->score_visitor_team = $matchFromApi->MatchResults[1]->PointsTeam2;
+        }
+
+        $match->save();
+
+        return $match;
+    }
+
+    public function scopeByMatchIdFromApi($query, $matchIdFromApi)
+    {
+        return $query->where('match_id_api', $matchIdFromApi);
+    }
+
+    public function analyseResultIfFinished()
+    {
+        if( $this->isFinished() ){
+            echo 'Match::' . $this->id . PHP_EOL;
+
+            $resultHomeTeam = $this->homeTeam
+                ->getResultFromSeason( $this->group->season );
+
+            $resultVisitorTeam = $this->visitorTeam
+                ->getResultFromSeason( $this->group->season );
+
+            if( empty($resultHomeTeam) ){
+                $resultHomeTeam = new Result();
+                $resultHomeTeam->season()->associate($this->group->season);
+                $resultHomeTeam->team()->associate($this->homeTeam);
+                $resultHomeTeam->save();
+            }
+
+            if( empty($resultVisitorTeam) ){
+                $resultVisitorTeam = new Result();
+                $resultVisitorTeam->season()->associate($this->group->season);
+                $resultVisitorTeam->team()->associate($this->visitorTeam);
+                $resultVisitorTeam->save();
+            }
+
+            $scoreHomeTeam = [
+                'goals_pro' => 0,
+                'goals_against' => 0,
+            ];
+
+            $scoreVisitorTeam = [
+                'goals_pro' => 0,
+                'goals_against' => 0,
+            ];
+
+            if( ! empty($resultHomeTeam->goals_pro) ){
+                $scoreHomeTeam['goals_pro'] = intval($resultHomeTeam->goals_pro);
+            }
+
+            if( ! empty($resultHomeTeam->goals_against) ){
+                $scoreHomeTeam['goals_against'] = intval($resultHomeTeam->goals_against);
+            }
+
+            if( ! empty($resultVisitorTeam->goals_pro) ){
+                $scoreVisitorTeam['goals_pro'] = intval($resultVisitorTeam->goals_pro);
+            }
+
+            if( ! empty($resultVisitorTeam->goals_against) ){
+                $scoreVisitorTeam['goals_against'] = intval($resultVisitorTeam->goals_against);
+            }
+
+            $scoreHomeTeam['goals_pro'] += $this->getHomeScore();
+            $scoreHomeTeam['goals_against'] += $this->getVisitorScore();
+            $scoreVisitorTeam['goals_pro'] += $this->getVisitorScore();
+            $scoreVisitorTeam['goals_against'] += $this->getHomeScore();
+
+            $resultHomeTeam->update([
+                'goals_pro'     => $scoreHomeTeam['goals_pro'],
+                'goals_against' => $scoreHomeTeam['goals_against'],
+                'goals_diff'    => intval($scoreHomeTeam['goals_pro']) - intval($scoreHomeTeam['goals_against']),
+            ]);
+
+            $resultVisitorTeam->update([
+                'goals_pro'     => $scoreVisitorTeam['goals_pro'],
+                'goals_against' => $scoreVisitorTeam['goals_against'],
+                'goals_diff'    => intval($scoreVisitorTeam['goals_pro']) - intval($scoreVisitorTeam['goals_against']),
+            ]);
+
+            if( $this->hasHomeTeamWon() ){
+                echo 'Match::' . $this->id . ' => HOME' . PHP_EOL;
+                $resultHomeTeam->teamWonMatch();
+                $resultVisitorTeam->teamLostMatch();
+            }
+            elseif( $this->hasVisitorTeamWon() ){
+                echo 'Match::' . $this->id . ' => VISITOR' . PHP_EOL;
+                $resultHomeTeam->teamLostMatch();
+                $resultVisitorTeam->teamWonMatch();
+            }
+            else{
+                echo 'Match::' . $this->id . ' => DRAW' . PHP_EOL;
+                $resultHomeTeam->teamDrawMatch();
+                $resultVisitorTeam->teamDrawMatch();
+            }
+
+            $resultHomeTeam->save();
+            $resultVisitorTeam->save();
+        }
+
+        return $this;
+    }
+
+    private function hasHomeTeamWon()
+    {
+        if( $this->getHomeScore() > $this->getVisitorScore() ){
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasVisitorTeamWon()
+    {
+        if( $this->getHomeScore() < $this->getVisitorScore() ){
+
+            return true;
+        }
+        return false;
     }
 
     public function getDateTimeString()
     {
-        return $this->dateTime->format('d/m/Y H:i');
-    }
-
-    public function getHome()
-    {
-        return $this->home;
-    }
-
-    public function getVisitor()
-    {
-        return $this->visitor;
-    }
-
-    public function getHomeScore()
-    {
-        return $this->scoreHome;
-    }
-
-    public function getVisitorScore()
-    {
-        return $this->scoreVisitor;
+        return $this->date_time->format('d/m/Y H:i');
     }
 
     public function isFinished()
     {
-        return $this->isFinished;
+        return $this->is_finished == 1;
     }
 
-    public function setDateTime($dateTimeUTC, $format = \DateTime::ATOM)
+    public function getHomeScore()
     {
-        $this->dateTime = Carbon::createFromFormat($format ,$dateTimeUTC);
+        return intval($this->score_home_team);
+    }
+
+    public function getVisitorScore()
+    {
+        return intval($this->score_visitor_team);
     }
 }

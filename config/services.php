@@ -36,6 +36,6 @@ return [
     ],
 
     'bundesliga' => [
-        'matches'        => 'https://www.openligadb.de/api/getmatchdata/',
+        'matches' => 'https://www.openligadb.de/api/getmatchdata/',
     ],
 ];
